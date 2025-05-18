@@ -6,7 +6,7 @@
 // Network credentials and PC destination
 const char* ssid = "Tenda_85DCD8";
 const char* password = "antonio1";
-const char* pc_ip = "192.168.0.105";  // PC IP address
+const char* pc_ip = "192.168.0.102";  // PC IP address
 const uint16_t pc_port = 4210;        // PC listening port
 
 // Camera configuration pins for AI Thinker module
@@ -59,7 +59,7 @@ void setup() {
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG; // Use JPEG for compression
   config.frame_size   = FRAMESIZE_QVGA; // 320x240
-  config.jpeg_quality = 4;
+  config.jpeg_quality = 10;
   config.fb_count     = psramFound() ? 2 : 1; // Double buffer if PSRAM available
 
   esp_err_t err = esp_camera_init(&config);
@@ -80,6 +80,13 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   Udp.begin(pc_port);
+  sensor_t *s = esp_camera_sensor_get();
+  s->set_brightness(s, 1);        // –2 to +2
+  s->set_contrast(s, 1);          // –2 to +2
+  s->set_saturation(s, 1);        // –2 to +2
+  s->set_gainceiling(s, (gainceiling_t)6); // 2× to 128×
+  s->set_exposure_ctrl(s, 1);     // Auto exposure
+  s->set_whitebal(s, 1);          // Auto white balance
 }
 
 void loop() {
