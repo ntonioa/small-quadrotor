@@ -1,12 +1,13 @@
 #include <WiFi.h>
 #include "esp_camera.h"
 #include <WiFiUdp.h>
+#include <algorithm>
 
-// Replace with your network credentials and PC destination
+// Network credentials and PC destination
 const char* ssid = "LAPTOP-QES4EU9V 7607";
 const char* password = "12345678";
-const char* pc_ip = "192.168.137.156";  // PC IP address
-const uint16_t pc_port = 4210;         // PC listening port
+const char* pc_ip = "192.168.137.1";  // PC IP address
+const uint16_t pc_port = 4210;        // PC listening port
 
 // Camera configuration pins for AI Thinker module
 #define PWDN_GPIO_NUM     32
@@ -14,7 +15,6 @@ const uint16_t pc_port = 4210;         // PC listening port
 #define XCLK_GPIO_NUM     0
 #define SIOD_GPIO_NUM     26
 #define SIOC_GPIO_NUM     27
-
 #define Y9_GPIO_NUM       35
 #define Y8_GPIO_NUM       34
 #define Y7_GPIO_NUM       39
@@ -23,7 +23,6 @@ const uint16_t pc_port = 4210;         // PC listening port
 #define Y4_GPIO_NUM       19
 #define Y3_GPIO_NUM       18
 #define Y2_GPIO_NUM       5
-
 #define VSYNC_GPIO_NUM    25
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
@@ -58,10 +57,10 @@ void setup() {
   config.pin_pwdn     = PWDN_GPIO_NUM;
   config.pin_reset    = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.pixel_format = PIXFORMAT_RGB565;
+  config.pixel_format = PIXFORMAT_JPEG; // Use JPEG for compression
   config.frame_size   = FRAMESIZE_QVGA; // 320x240
   config.jpeg_quality = 12;
-  config.fb_count     = 1;
+  config.fb_count     = psramFound() ? 2 : 1; // Double buffer if PSRAM available
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -77,66 +76,44 @@ void setup() {
     Serial.print(".");
   }
   Serial.println("\nWiFi connected");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
 
   Udp.begin(pc_port);
 }
 
 void loop() {
-  unsigned long start = millis();
-
-  // Capture frame
-  camera_fb_t * fb = esp_camera_fb_get();
-  if (!fb) {
-    Serial.println("Camera capture failed");
+  // Check WiFi connection
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected, reconnecting...");
+    WiFi.reconnect();
+    delay(5000);
     return;
   }
 
-  int width = fb->width;
-  int height = fb->height;
-  uint16_t * buf = (uint16_t *)fb->buf;
-
-  // Variables for centroid
-  uint32_t sum_x = 0, sum_y = 0, count = 0;
-  
-  // Threshold red channel
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      uint16_t pixel = buf[y * width + x];
-      // RGB565 -> extract R, G, B
-      uint8_t r = (pixel >> 11) * 8;
-      uint8_t g = ((pixel >> 5) & 0x3F) * 4;
-      uint8_t b = (pixel & 0x1F) * 8;
-      // Simple red detection
-      if (r > 150 && r > g + 40 && r > b + 40) {
-        sum_x += x;
-        sum_y += y;
-        count++;
-      }
-    }
+  camera_fb_t* fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    delay(FRAME_DELAY_MS);
+    return;
   }
 
-  float cx = 0, cy = 0;
-  if (count > 0) {
-    cx = (float)sum_x / count;
-    cy = (float)sum_y / count;
+  // Split frame into UDP packets
+  const int packetSize = 1400; // Optimized for MTU
+  int totalPackets = (fb->len + packetSize - 1) / packetSize;
+
+  for (int i = 0; i < totalPackets; i++) {
+    int offset = i * packetSize;
+    int size = std::min(packetSize, static_cast<int>(fb->len - offset));
+
+    Udp.beginPacket(pc_ip, pc_port);
+    Udp.write((uint8_t*)(fb->buf + offset), size);
+    Udp.endPacket();
+    yield(); // Allow background tasks
   }
 
-  // Send coordinates
-  char msg[64];
-  snprintf(msg, sizeof(msg), "%.2f,%.2f", cx, cy);
-  Udp.beginPacket(pc_ip, pc_port);
-  Udp.write((uint8_t*)msg, strlen(msg));
-  Udp.endPacket();
+  Serial.printf("Frame sent: %d bytes in %d packets\n", fb->len, totalPackets);
 
-  Serial.printf("Centroid: x=%.2f, y=%.2f, pixels=%u\n", cx, cy, count);
-
-  esp_camera_fb_return(fb);
-
-  // Maintain target FPS
-  unsigned long elapsed = millis() - start;
-  if (elapsed < FRAME_DELAY_MS) {
-    delay(FRAME_DELAY_MS - elapsed);
-  }
+  esp_camera_fb_return(fb); // Free buffer
+  delay(FRAME_DELAY_MS);    // Maintain frame rate
 }
-
-
