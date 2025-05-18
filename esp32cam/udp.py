@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 
 # UDP configuration
-UDP_IP = "192.168.0.105"  # PC's IP address (update if different)
+UDP_IP = "0.0.0.0"  # PC's IP address (update if different)
 UDP_PORT = 4210           # Matches ESP32-CAM
 BUFFER_SIZE = 65535       # Max UDP packet size
 
@@ -75,9 +75,9 @@ while True:
                     cv2.imshow("Mask", mask)
 
                     # Save frame for debugging
-                    frame_count += 1
-                    cv2.imwrite(f"frame_{frame_count}.jpg", frame)
-                    print(f"[INFO] Saved frame_{frame_count}.jpg")
+                    # frame_count += 1
+                    # cv2.imwrite(f"frame_{frame_count}.jpg", frame)
+                    # print(f"[INFO] Saved frame_{frame_count}.jpg")
 
                 else:
                     print("[WARN] Failed to decode JPEG frame")
