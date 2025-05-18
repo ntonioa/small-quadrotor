@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 
 # UDP configuration
-UDP_IP = "192.168.137.1"  # PC's IP address (update if different)
+UDP_IP = "192.168.0.105"  # PC's IP address (update if different)
 UDP_PORT = 4210           # Matches ESP32-CAM
 BUFFER_SIZE = 65535       # Max UDP packet size
 
