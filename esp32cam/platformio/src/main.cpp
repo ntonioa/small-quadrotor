@@ -4,9 +4,9 @@
 #include <algorithm>
 
 // Network credentials and PC destination
-const char* ssid = "Tenda_85DCD8";
+const char* ssid = "TIM-29730537";
 const char* password = "antonio1";
-const char* pc_ip = "192.168.0.102";  // PC IP address
+const char* pc_ip = "192.168.0.207";  // PC IP address
 const uint16_t pc_port = 4210;        // PC listening port
 
 // Camera configuration pins for AI Thinker module
@@ -81,11 +81,19 @@ void setup() {
 
   Udp.begin(pc_port);
   sensor_t *s = esp_camera_sensor_get();
-  s->set_brightness(s, 1);        // –2 to +2
-  s->set_contrast(s, 1);          // –2 to +2
-  s->set_saturation(s, 1);        // –2 to +2
-  s->set_gainceiling(s, (gainceiling_t)6); // 2× to 128×
-  s->set_exposure_ctrl(s, 1);     // Auto exposure
+  if (s->id.PID == OV2640_PID) {
+    s->set_vflip(s, 1);        // Corregge l'orientamento
+    s->set_brightness(s, 1);   // Aumenta la luminosità
+    s->set_saturation(s, -2);  // Riduce la saturazione
+  } else {
+    s->set_vflip(s, 1);        // Per OV2640, se necessario
+    s->set_hmirror(s, 1);      // Specchio orizzontale, se necessario
+  }
+  s->set_brightness(s, 1);
+  s->set_contrast(s, 1);
+  s->set_saturation(s, 1);
+  s->set_gainceiling(s, (gainceiling_t)6);
+  s->set_exposure_ctrl(s, 1);
   s->set_whitebal(s, 1);          // Auto white balance
 }
 
