@@ -1,0 +1,75 @@
+#include <Arduino.h>
+
+#define PWM_FREQUENCY 78000
+#define PWM_RESOLUTION 10
+#define PWM_STOP 0
+#define PWM_MIN 0
+#define PWM_MAX (1000000 / PWM_FREQUENCY)
+
+const int motorPins[4] = {12, 13, 14, 15};
+const int motorChannels[4] = {0, 1, 2, 3};
+
+int currentMotor = 0;
+float dutyVal = 0.0f;
+float dutyStep = 0.02f;
+bool rising = true;
+unsigned long lastUpdate = 0;
+const unsigned long updateInterval = 30; // ms
+
+int getDutyCycle(float value);
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Avvio sweep ciclico su 4 motori...");
+
+  for (int i = 0; i < 4; i++) {
+    ledcSetup(motorChannels[i], PWM_FREQUENCY, PWM_RESOLUTION);
+    ledcAttachPin(motorPins[i], motorChannels[i]);
+    ledcWrite(motorChannels[i], getDutyCycle(0.0f));
+  }
+}
+
+void loop() {
+  unsigned long now = millis();
+  if (now - lastUpdate >= updateInterval) {
+    lastUpdate = now;
+
+    // Calcola duty e applica al motore corrente
+    int duty = getDutyCycle(dutyVal);
+    ledcWrite(motorChannels[currentMotor], duty);
+
+    // Aggiorna valore del duty per il prossimo step
+    if (rising) {
+      dutyVal += dutyStep;
+      if (dutyVal >= 0.5f) {
+        dutyVal = 0.5f;
+        rising = false;
+      }
+    } else {
+      dutyVal -= dutyStep;
+      if (dutyVal <= 0.0f) {
+        dutyVal = 0.0f;
+        rising = true;
+
+        // Spegni motore corrente e passa al prossimo
+        ledcWrite(motorChannels[currentMotor], getDutyCycle(0.0f));
+        currentMotor = (currentMotor + 1) % 4;
+      }
+    }
+
+    // Debug seriale
+    Serial.print("Motore ");
+    Serial.print(currentMotor);
+    Serial.print(" → Duty: ");
+    Serial.print(dutyVal * 100);
+    Serial.println("%");
+  }
+}
+
+int getDutyCycle(float value) {
+  value = constrain(value, 0.0f, 1.0f);
+  float pwm = value * (PWM_MAX - PWM_MIN) + PWM_MIN;
+  if (value == 0) pwm = PWM_STOP;
+  float duty = pwm * ((1 << PWM_RESOLUTION) - 1) / (1000000.0f / PWM_FREQUENCY);
+  return round(duty);
+}
