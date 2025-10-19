@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "../../../../imu_project"
+		},
+		{
+			"name": "imu_eigen_test",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"core": "cpp",
+			"dense": "cpp"
+		}
+	}
+}
