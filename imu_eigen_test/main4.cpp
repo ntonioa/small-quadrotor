@@ -188,9 +188,10 @@ static Eigen::Matrix3f J_body()
 }
 
 // Guadagni regolabili a runtime (roll, pitch, yaw)
-// Ridotti del 50% per migliorare stabilità
-static float g_kR_roll = 4.0f,  g_kR_pitch = 2.0f,  g_kR_yaw = 0.00f;
-static float g_kW_roll = 0.75f,  g_kW_pitch = 0.4f,  g_kW_yaw = 0.00f;
+// Riduci drasticamente i guadagni per il test
+// Guadagni di volo standard
+static float g_kR_roll = 8.0f,  g_kR_pitch = 8.0f,  g_kR_yaw = 0.00f;
+static float g_kW_roll = 1.5f,  g_kW_pitch = 1.5f,  g_kW_yaw = 0.00f;
 
 // ====== Comandi da QGC ======
 struct PilotCmd
@@ -667,7 +668,7 @@ void loop()
   Vec7 x_pred;
   Mat77 P_pred;
   Predict(x, omega_measured_rads, dt, P, Qm, &x_pred, &P_pred);
-Vec7 x_upd;
+  Vec7 x_upd;
   Mat77 P_upd;
   Update(x_pred, P_pred, z, Rm, &x_upd, &P_upd);
   x_upd.head<4>().normalize();
@@ -745,15 +746,6 @@ Vec7 x_upd;
   J_body(),
       MASS, GRAV, thr_eff,
       &y_wrench);
-
-  // DISACCOPPIAMENTO: riduce l'effetto roll→pitch spurio nel controllore
-  // Quando roll è grande, il controllore genera pitch indesiderato
-  float roll_abs = fabsf(roll);
-  if (roll_abs > 10.0f * M_PI / 180.0f) {  // oltre 10°
-    float roll_factor = roll_abs / (30.0f * M_PI / 180.0f);  // 0..1 per 10-30°
-    if (roll_factor > 1.0f) roll_factor = 1.0f;
-    y_wrench(1) *= (1.0f - 0.9f * roll_factor);  // riduce τy fino al 90% (più aggressivo)
-  }
 
   // DEBUG: stampa ogni 500ms
   static uint32_t last_debug = 0;
